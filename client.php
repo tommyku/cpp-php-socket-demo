@@ -1,7 +1,7 @@
 <?php
 error_reporting(E_ALL);
 
-if(!($sock = socket_create(AF_INET, SOCK_STREAM, 0)))
+if(!($sock = socket_create(AF_UNIX, SOCK_STREAM, 0)))
 {
     $errorcode = socket_last_error();
     $errormsg = socket_strerror($errorcode);
@@ -11,7 +11,7 @@ if(!($sock = socket_create(AF_INET, SOCK_STREAM, 0)))
 
 echo "Socket created";
 
-if(!socket_connect($sock , '127.0.0.1' , 5700))
+if(!socket_connect($sock , '/tmp/server.sock'))
 {
     $errorcode = socket_last_error();
     $errormsg = socket_strerror($errorcode);

@@ -4,17 +4,49 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 #include <signal.h>
 
 using namespace std;
 
+#define SOCKET_FILENAME "/tmp/server.sock"
+
 int server;
 
-void bindSocket(int &server, int &reuse, sockaddr_in &server_addr)
+void signal_callback_handler(int signum)
 {
+  // close server
+  close(server);
+  // remove the socket file
+  unlink(SOCKET_FILENAME);
+  // signal handled
+  exit(0);
+}
+
+int main(int argc, char **argv)
+{
+  struct sockaddr_un server_addr, client_addr;
+  socklen_t clientlen = sizeof(client_addr);
+  int client, buflen, nread, initCommResult;
+  char *buf;
+  char c;
+  int reuse = 1;
+
+  puts("Hell World");
+
+  // listen to SIGINT, SIGTERM, and SIGKILL
+  signal(SIGINT, signal_callback_handler);
+  signal(SIGTERM, signal_callback_handler);
+  signal(SIGKILL, signal_callback_handler);
+
+  // setup socket address structure
+  memset(&server_addr, 0, sizeof(server_addr));
+  server_addr.sun_family = AF_UNIX;
+  strcpy(server_addr.sun_path, SOCKET_FILENAME);
+
   // create socket
-  server = socket(PF_INET, SOCK_STREAM, 0);
+  server = socket(PF_UNIX, SOCK_STREAM, 0);
   if (!server) {
     perror("socket");
     exit(-1);
@@ -41,41 +73,6 @@ void bindSocket(int &server, int &reuse, sockaddr_in &server_addr)
   }
 
   puts("Listening to connection...");
-}
-
-void signal_callback_handler(int signum)
-{
-  // close server
-  close(server);
-  // signal handled
-  exit(0);
-}
-
-int main(int argc, char **argv)
-{
-  struct sockaddr_in server_addr, client_addr;
-  socklen_t clientlen = sizeof(client_addr);
-  int client, buflen, nread, initCommResult;
-  char *buf;
-  char c;
-  int port = 5700;
-  int reuse = 1;
-
-  puts("Hell World");
-
-  // listen to SIGINT and SIGTERM
-  signal(SIGINT, signal_callback_handler);
-  signal(SIGTERM, signal_callback_handler);
-  signal(SIGKILL, signal_callback_handler);
-
-  // setup socket address structure
-  memset(&server_addr, 0, sizeof(server_addr));
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(port);
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-
-  // create socket and bind it
-  bindSocket(server, reuse, server_addr);
 
   // allocate buffer
   buflen = 1024;
@@ -84,10 +81,6 @@ int main(int argc, char **argv)
   // loop to handle all requests
   while (1) {
     unsigned int client = accept(server, (struct sockaddr *)&client_addr, &clientlen);
-
-    // close socket first to refuse any further connection
-    close(server);
-    puts("Socket closed while handling new connection");
 
     // read a request
     memset(buf, 0, buflen);
@@ -99,10 +92,6 @@ int main(int argc, char **argv)
     send(client, buf, nread, 0);
 
     close(client);
-
-    // re-create socket and bind it
-    puts("Re-opening socket...");
-    bindSocket(server, reuse, server_addr);
   }
 
   close(server);
