@@ -14,6 +14,32 @@ using namespace std;
 
 int server;
 
+void bind_listen_socket(int &server, sockaddr_un &server_addr)
+{
+  // create socket
+  server = socket(PF_UNIX, SOCK_STREAM, 0);
+  if (!server) {
+    perror("socket");
+    exit(-1);
+  }
+
+  // call bind to associate the socket with our local address and
+  // port
+  if (bind(server, (const struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    perror("bind");
+    exit(-1);
+  }
+
+  // convert the socket to listen for incoming connections
+  if (listen(server, 0) < 0) {
+    perror("listen");
+    exit(-1);
+  }
+
+  puts("Listening to connection...");
+
+}
+
 void signal_callback_handler(int signum)
 {
   // close server
@@ -43,27 +69,8 @@ int main(int argc, char **argv)
   server_addr.sun_family = AF_UNIX;
   strcpy(server_addr.sun_path, SOCKET_FILENAME);
 
-  // create socket
-  server = socket(PF_UNIX, SOCK_STREAM, 0);
-  if (!server) {
-    perror("socket");
-    exit(-1);
-  }
-
-  // call bind to associate the socket with our local address and
-  // port
-  if (bind(server, (const struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-    perror("bind");
-    exit(-1);
-  }
-
-  // convert the socket to listen for incoming connections
-  if (listen(server, 0) < 0) {
-    perror("listen");
-    exit(-1);
-  }
-
-  puts("Listening to connection...");
+  // bind and listen on the socket file
+  bind_listen_socket(server, server_addr);
 
   // allocate buffer
   buflen = 1024;
@@ -72,6 +79,10 @@ int main(int argc, char **argv)
   // loop to handle all requests
   while (1) {
     unsigned int client = accept(server, (struct sockaddr *)&client_addr, &clientlen);
+
+    // got a request, close the socket
+    close(server);
+    unlink(SOCKET_FILENAME);
 
     // read a request
     memset(buf, 0, buflen);
@@ -83,11 +94,16 @@ int main(int argc, char **argv)
     send(client, buf, nread, 0);
 
     close(client);
+
+    sleep(2);
+
+    // re-bind and listen on the socket
+    bind_listen_socket(server, server_addr);
   }
 
   close(server);
 
   unlink(SOCKET_FILENAME);
 
-return 0;
+  return 0;
 }
