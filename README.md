@@ -6,6 +6,12 @@ Build the server
 $ make server
 ~~~
 
+Execute the server
+
+~~~bash
+$ ./server
+~~~
+
 Build the server that accepts only a single connection at a time
 
 ~~~bash
